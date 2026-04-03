@@ -11,10 +11,10 @@ export const withBatchedUpdates = <
   TFunction extends ((event: any) => void) | (() => void),
 >(
   func: Parameters<TFunction>["length"] extends 0 | 1 ? TFunction : never,
-) =>
-  ((event) => {
-    unstable_batchedUpdates(func as TFunction, event);
-  }) as TFunction;
+) => func;
+// ((event) => {
+//   unstable_batchedUpdates(func as TFunction, event);
+// }) as TFunction;
 
 /**
  * barches React state updates and throttles the calls to a single call per

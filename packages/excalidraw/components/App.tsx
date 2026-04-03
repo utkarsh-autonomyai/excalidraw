@@ -628,10 +628,7 @@ const roundFreeDrawPressure = (value: number) =>
   round(value, FREEDRAW_PRESSURE_DECIMALS);
 
 const getRoundedFreeDrawPoint = (x: number, y: number) =>
-  pointFrom<LocalPoint>(
-    roundFreeDrawCoordinate(x),
-    roundFreeDrawCoordinate(y),
-  );
+  pointFrom<LocalPoint>(roundFreeDrawCoordinate(x), roundFreeDrawCoordinate(y));
 
 class App extends React.Component<AppProps, AppState> {
   canvas: AppClassProperties["canvas"];
@@ -8098,7 +8095,7 @@ class App extends React.Component<AppProps, AppState> {
 
     setCursor(this.interactiveCanvas, CURSOR_TYPE.GRABBING);
     let { clientX: lastX, clientY: lastY } = event;
-    const onPointerMove = withBatchedUpdatesThrottled((event: PointerEvent) => {
+    const onPointerMove = ((event: PointerEvent) => {
       const deltaX = lastX - event.clientX;
       const deltaY = lastY - event.clientY;
       lastX = event.clientX;
@@ -8164,7 +8161,7 @@ class App extends React.Component<AppProps, AppState> {
         window.removeEventListener(EVENT.POINTER_MOVE, onPointerMove);
         window.removeEventListener(EVENT.POINTER_UP, teardown);
         window.removeEventListener(EVENT.BLUR, teardown);
-        onPointerMove.flush();
+        // onPointerMove.flush();
       }),
     );
     window.addEventListener(EVENT.BLUR, teardown);
@@ -8274,14 +8271,14 @@ class App extends React.Component<AppProps, AppState> {
     isDraggingScrollBar = true;
     pointerDownState.lastCoords.x = event.clientX;
     pointerDownState.lastCoords.y = event.clientY;
-    const onPointerMove = withBatchedUpdatesThrottled((event: PointerEvent) => {
+    const onPointerMove = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) {
         return;
       }
 
       this.handlePointerMoveOverScrollbars(event, pointerDownState);
-    });
+    };
     const onPointerUp = withBatchedUpdates(() => {
       lastPointerUp = null;
       isDraggingScrollBar = false;
@@ -8292,7 +8289,7 @@ class App extends React.Component<AppProps, AppState> {
       this.savePointer(event.clientX, event.clientY, "up");
       window.removeEventListener(EVENT.POINTER_MOVE, onPointerMove);
       window.removeEventListener(EVENT.POINTER_UP, onPointerUp);
-      onPointerMove.flush();
+      // onPointerMove.flush();
     });
 
     lastPointerUp = onPointerUp;
@@ -8855,7 +8852,9 @@ class App extends React.Component<AppProps, AppState> {
       locked: false,
       frameId: topLayerFrame ? topLayerFrame.id : null,
       points: [pointFrom<LocalPoint>(0, 0)],
-      pressures: simulatePressure ? [] : [roundFreeDrawPressure(event.pressure)],
+      pressures: simulatePressure
+        ? []
+        : [roundFreeDrawPressure(event.pressure)],
     });
 
     this.scene.insertElement(element);
@@ -9497,7 +9496,7 @@ class App extends React.Component<AppProps, AppState> {
   private onPointerMoveFromPointerDownHandler(
     pointerDownState: PointerDownState,
   ) {
-    return withBatchedUpdatesThrottled((event: PointerEvent) => {
+    return (event: PointerEvent) => {
       if (this.state.openDialog?.name === "elementLinkSelector") {
         return;
       }
@@ -10204,17 +10203,17 @@ class App extends React.Component<AppProps, AppState> {
                   zoomValue: this.state.zoom.value,
                 })
               : points.length > 0 &&
-                  points[points.length - 1][0] === nextPoint[0] &&
-                  points[points.length - 1][1] === nextPoint[1]
-                ? "discard"
-                : "append";
+                points[points.length - 1][0] === nextPoint[0] &&
+                points[points.length - 1][1] === nextPoint[1]
+              ? "discard"
+              : "append";
 
           if (pointAction !== "discard") {
             const pressures = newElement.simulatePressure
               ? newElement.pressures
               : pointAction === "replace"
-                ? [...newElement.pressures.slice(0, -1), pressure]
-                : [...newElement.pressures, pressure];
+              ? [...newElement.pressures.slice(0, -1), pressure]
+              : [...newElement.pressures, pressure];
 
             this.scene.mutateElement(
               newElement,
@@ -10380,7 +10379,7 @@ class App extends React.Component<AppProps, AppState> {
           });
         }
       }
-    });
+    };
   }
 
   // Returns whether the pointer move happened over either scrollbar
@@ -10425,7 +10424,7 @@ class App extends React.Component<AppProps, AppState> {
       this.removePointer(childEvent);
       pointerDownState.drag.blockDragging = false;
       if (pointerDownState.eventListeners.onMove) {
-        pointerDownState.eventListeners.onMove.flush();
+        // pointerDownState.eventListeners.onMove.flush();
       }
       const {
         newElement,
@@ -10667,10 +10666,7 @@ class App extends React.Component<AppProps, AppState> {
         let nextPoint = getRoundedFreeDrawPoint(dx, dy);
 
         // Allows dots to avoid being flagged as infinitely small
-        if (
-          nextPoint[0] === points[0][0] &&
-          nextPoint[1] === points[0][1]
-        ) {
+        if (nextPoint[0] === points[0][0] && nextPoint[1] === points[0][1]) {
           nextPoint = getRoundedFreeDrawPoint(
             dx + FREEDRAW_DOT_EPSILON,
             dy + FREEDRAW_DOT_EPSILON,
@@ -10689,10 +10685,10 @@ class App extends React.Component<AppProps, AppState> {
                 isFinalPoint: true,
               })
             : !lastPoint ||
-                lastPoint[0] !== nextPoint[0] ||
-                lastPoint[1] !== nextPoint[1]
-              ? "append"
-              : "discard";
+              lastPoint[0] !== nextPoint[0] ||
+              lastPoint[1] !== nextPoint[1]
+            ? "append"
+            : "discard";
 
         if (pointAction !== "discard") {
           this.scene.mutateElement(newElement, {
@@ -10703,8 +10699,8 @@ class App extends React.Component<AppProps, AppState> {
             pressures: newElement.simulatePressure
               ? []
               : pointAction === "replace"
-                ? [...newElement.pressures.slice(0, -1), pressure]
-                : [...newElement.pressures, pressure],
+              ? [...newElement.pressures.slice(0, -1), pressure]
+              : [...newElement.pressures, pressure],
           });
         }
 

@@ -890,7 +890,7 @@ export type PointerDownState = Readonly<{
   // We need to have these in the state so that we can unsubscribe them
   eventListeners: {
     // It's defined on the initial pointer down event
-    onMove: null | ReturnType<typeof throttleRAF>;
+    onMove: null | ((event: PointerEvent) => void);
     // It's defined on the initial pointer down event
     onUp: null | ((event: PointerEvent) => void);
     // It's defined on the initial pointer down event

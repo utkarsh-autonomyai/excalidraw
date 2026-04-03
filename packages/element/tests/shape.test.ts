@@ -30,16 +30,17 @@ describe("freedraw stroke shape", () => {
     expect(vi.mocked(getStroke)).not.toHaveBeenCalled();
   });
 
-  it("renders fixed stroke corners as straight segments", () => {
+  it("rounds fixed stroke corners without flattening them", () => {
     const element = API.createElement({
       type: "freedraw",
       strokeShape: "fixed",
+      strokeWidth: 1,
       points: [pointFrom(0, 0), pointFrom(10, 0), pointFrom(10, 10)],
     });
 
     const [path] = ShapeCache.generateElementShape(element, null);
 
-    expect(path).toBe("M0,0 L10,0 L10,10 ");
+    expect(path).toBe("M0,0 L8.5,0 Q10,0 10,1.5 L10,10 ");
   });
 
   it("smooths dense fixed stroke points without dropping them", () => {

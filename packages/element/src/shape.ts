@@ -1187,6 +1187,7 @@ const getFreeDrawSvgPath = (element: ExcalidrawFreeDrawElement) => {
   if (element.strokeShape === "fixed") {
     return getSvgPathFromFixedFreeDrawPoints(
       getRenderableFixedFreeDrawPoints(element),
+      element.strokeWidth,
     ) as SVGPathString;
   }
 
@@ -1257,6 +1258,10 @@ const getSvgPathFromPoints = (
 
 const FIXED_FREEDRAW_MIN_SMOOTH_ALIGNMENT = 0.6;
 const FIXED_FREEDRAW_MIN_SMOOTH_SEGMENT_LENGTH = 0.2;
+const FIXED_FREEDRAW_MIN_CORNER_ROUNDING = 0.75;
+const FIXED_FREEDRAW_MAX_CORNER_ROUNDING = 6;
+const FIXED_FREEDRAW_CORNER_ROUNDING_FACTOR = 0.35;
+const FIXED_FREEDRAW_CORNER_ROUNDING_WIDTH_FACTOR = 1.5;
 
 const shouldSmoothFixedFreeDrawPoint = (
   previousPoint: readonly number[],
@@ -1284,8 +1289,60 @@ const shouldSmoothFixedFreeDrawPoint = (
   return alignment >= FIXED_FREEDRAW_MIN_SMOOTH_ALIGNMENT;
 };
 
+const getFixedFreeDrawRoundedCorner = (
+  previousPoint: readonly number[],
+  currentPoint: readonly number[],
+  nextPoint: readonly number[],
+  strokeWidth: number,
+) => {
+  const previousDeltaX = currentPoint[0] - previousPoint[0];
+  const previousDeltaY = currentPoint[1] - previousPoint[1];
+  const nextDeltaX = nextPoint[0] - currentPoint[0];
+  const nextDeltaY = nextPoint[1] - currentPoint[1];
+  const previousSegmentLength = Math.hypot(previousDeltaX, previousDeltaY);
+  const nextSegmentLength = Math.hypot(nextDeltaX, nextDeltaY);
+
+  if (!previousSegmentLength || !nextSegmentLength) {
+    return null;
+  }
+
+  const alignment =
+    (previousDeltaX * nextDeltaX + previousDeltaY * nextDeltaY) /
+    (previousSegmentLength * nextSegmentLength);
+
+  if (alignment >= FIXED_FREEDRAW_MIN_SMOOTH_ALIGNMENT) {
+    return null;
+  }
+
+  const cornerRounding = Math.min(
+    Math.max(
+      strokeWidth * FIXED_FREEDRAW_CORNER_ROUNDING_WIDTH_FACTOR,
+      FIXED_FREEDRAW_MIN_CORNER_ROUNDING,
+    ),
+    previousSegmentLength * FIXED_FREEDRAW_CORNER_ROUNDING_FACTOR,
+    nextSegmentLength * FIXED_FREEDRAW_CORNER_ROUNDING_FACTOR,
+    FIXED_FREEDRAW_MAX_CORNER_ROUNDING,
+  );
+
+  if (!cornerRounding) {
+    return null;
+  }
+
+  return {
+    entryPoint: [
+      currentPoint[0] - (previousDeltaX / previousSegmentLength) * cornerRounding,
+      currentPoint[1] - (previousDeltaY / previousSegmentLength) * cornerRounding,
+    ] as const,
+    exitPoint: [
+      currentPoint[0] + (nextDeltaX / nextSegmentLength) * cornerRounding,
+      currentPoint[1] + (nextDeltaY / nextSegmentLength) * cornerRounding,
+    ] as const,
+  };
+};
+
 const getSvgPathFromFixedFreeDrawPoints = (
   points: ReadonlyArray<readonly number[]>,
+  strokeWidth: number,
 ): string => {
   const len = points.length;
 
@@ -1303,14 +1360,27 @@ const getSvgPathFromFixedFreeDrawPoints = (
     const previousPoint = points[index - 1];
     const currentPoint = points[index];
     const nextPoint = points[index + 1];
-
-    path += shouldSmoothFixedFreeDrawPoint(
+    const shouldSmooth = shouldSmoothFixedFreeDrawPoint(
       previousPoint,
       currentPoint,
       nextPoint,
-    )
+    );
+    const roundedCorner = shouldSmooth
+      ? null
+      : getFixedFreeDrawRoundedCorner(
+          previousPoint,
+          currentPoint,
+          nextPoint,
+          strokeWidth,
+        );
+
+    path += shouldSmooth
       ? `Q${roundPoint(currentPoint)}${averagePoint(currentPoint, nextPoint)}`
-      : `L${roundPoint(currentPoint)}`;
+      : roundedCorner
+        ? `L${roundPoint(roundedCorner.entryPoint)}Q${roundPoint(
+            currentPoint,
+          )}${roundPoint(roundedCorner.exitPoint)}`
+        : `L${roundPoint(currentPoint)}`;
   }
 
   return `${path}L${roundPoint(points[len - 1])}`;

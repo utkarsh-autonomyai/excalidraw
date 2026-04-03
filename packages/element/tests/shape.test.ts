@@ -56,6 +56,32 @@ describe("freedraw stroke shape", () => {
     expect(path).toBe("M0,0 L10,0 L9,1 ");
   });
 
+  it("curves directly to the endpoint for tiny final smooth segments", () => {
+    const element = API.createElement({
+      type: "freedraw",
+      strokeShape: "fixed",
+      strokeWidth: 1,
+      points: [pointFrom(0, 0), pointFrom(0.5, 0.1), pointFrom(0.8, 0.3)],
+    });
+
+    const [path] = ShapeCache.generateElementShape(element, null);
+
+    expect(path).toBe("M0,0 Q0.5,0.1 0.8,0.3 ");
+  });
+
+  it("curves directly to the endpoint for tiny final rounded corners", () => {
+    const element = API.createElement({
+      type: "freedraw",
+      strokeShape: "fixed",
+      strokeWidth: 1,
+      points: [pointFrom(0, 0), pointFrom(10, 0), pointFrom(10, 1)],
+    });
+
+    const [path] = ShapeCache.generateElementShape(element, null);
+
+    expect(path).toBe("M0,0 L9.65,0 Q10,0 10,1 ");
+  });
+
   it("smooths dense fixed stroke points without dropping them", () => {
     const element = API.createElement({
       type: "freedraw",

@@ -1233,6 +1233,11 @@ const roundPoint = (point: readonly number[]) =>
 const averagePoint = (A: readonly number[], B: readonly number[]) =>
   `${round((A[0] + B[0]) / 2, 2)},${round((A[1] + B[1]) / 2, 2)} `;
 
+const getReadonlyPointDistance = (
+  pointA: readonly number[],
+  pointB: readonly number[],
+) => Math.hypot(pointA[0] - pointB[0], pointA[1] - pointB[1]);
+
 // Trim SVG path data so number are each two decimal points. This
 // improves SVG exports, and prevents rendering errors on points
 // with long decimals.
@@ -1263,6 +1268,9 @@ const FIXED_FREEDRAW_MIN_CORNER_ROUNDING = 0.75;
 const FIXED_FREEDRAW_MAX_CORNER_ROUNDING = 6;
 const FIXED_FREEDRAW_CORNER_ROUNDING_FACTOR = 0.35;
 const FIXED_FREEDRAW_CORNER_ROUNDING_WIDTH_FACTOR = 1.5;
+const FIXED_FREEDRAW_MIN_TERMINAL_STUB = 0.75;
+const FIXED_FREEDRAW_MAX_TERMINAL_STUB = 2.5;
+const FIXED_FREEDRAW_TERMINAL_STUB_WIDTH_FACTOR = 1.5;
 
 const shouldSmoothFixedFreeDrawPoint = (
   previousPoint: readonly number[],
@@ -1344,6 +1352,15 @@ const getFixedFreeDrawRoundedCorner = (
   };
 };
 
+const getFixedFreeDrawTerminalStubThreshold = (strokeWidth: number) =>
+  Math.min(
+    Math.max(
+      strokeWidth * FIXED_FREEDRAW_TERMINAL_STUB_WIDTH_FACTOR,
+      FIXED_FREEDRAW_MIN_TERMINAL_STUB,
+    ),
+    FIXED_FREEDRAW_MAX_TERMINAL_STUB,
+  );
+
 const getSvgPathFromFixedFreeDrawPoints = (
   points: ReadonlyArray<readonly number[]>,
   strokeWidth: number,
@@ -1359,11 +1376,17 @@ const getSvgPathFromFixedFreeDrawPoints = (
   }
 
   let path = `M${roundPoint(points[0])}`;
+  const lastPoint = points[len - 1];
+  let endsAtLastPoint = false;
 
   for (let index = 1; index < len - 1; index++) {
     const previousPoint = points[index - 1];
     const currentPoint = points[index];
     const nextPoint = points[index + 1];
+    const isLastCurveSegment = index === len - 2;
+    const terminalStubThreshold = getFixedFreeDrawTerminalStubThreshold(
+      strokeWidth,
+    );
     const shouldSmooth = shouldSmoothFixedFreeDrawPoint(
       previousPoint,
       currentPoint,
@@ -1377,17 +1400,37 @@ const getSvgPathFromFixedFreeDrawPoints = (
           nextPoint,
           strokeWidth,
         );
+    const shouldCollapseSmoothTerminalStub =
+      isLastCurveSegment &&
+      shouldSmooth &&
+      getReadonlyPointDistance(currentPoint, nextPoint) / 2 <=
+        terminalStubThreshold;
+    const shouldCollapseRoundedTerminalStub =
+      isLastCurveSegment &&
+      !!roundedCorner &&
+      getReadonlyPointDistance(roundedCorner.exitPoint, lastPoint) <=
+        terminalStubThreshold;
 
     path += shouldSmooth
-      ? `Q${roundPoint(currentPoint)}${averagePoint(currentPoint, nextPoint)}`
+      ? `Q${roundPoint(currentPoint)}${
+          shouldCollapseSmoothTerminalStub
+            ? roundPoint(lastPoint)
+            : averagePoint(currentPoint, nextPoint)
+        }`
       : roundedCorner
         ? `L${roundPoint(roundedCorner.entryPoint)}Q${roundPoint(
             currentPoint,
-          )}${roundPoint(roundedCorner.exitPoint)}`
+          )}${
+            shouldCollapseRoundedTerminalStub
+              ? roundPoint(lastPoint)
+              : roundPoint(roundedCorner.exitPoint)
+          }`
         : `L${roundPoint(currentPoint)}`;
+    endsAtLastPoint =
+      shouldCollapseSmoothTerminalStub || shouldCollapseRoundedTerminalStub;
   }
 
-  return `${path}L${roundPoint(points[len - 1])}`;
+  return endsAtLastPoint ? path : `${path}L${roundPoint(lastPoint)}`;
 };
 
 const getSvgPathFromStroke = (
